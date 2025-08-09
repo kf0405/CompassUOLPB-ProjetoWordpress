@@ -77,8 +77,6 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 
 ### 🔹 **v1.1 - Configuração do EFS**
 **Objetivo**: Criar o sistema de arquivos compartilhado entre instâncias
-
-![]
 **Etapas:**
 - Criar EFS
 Para criar o EFS, pesquisaremos por EFS e selecionaremos "Create". Nessa janela, selecionamos nome, tipo, e AZ.
@@ -92,6 +90,100 @@ Em "Lifecycle Management" podemos também retirar as opções de transição par
 Ao script user-data, foi adicionadas as linhas abaixo, para montar o EFS na instância quando ela for criada.
 `mount -t efs ${EFS_ID}:/ /var/www/html`
 `echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab`
+
+---
+### 🔹 **v1.2 - Deploy do WordPress com Docker e EFS**
+**Objetivo**: Rodar o WordPress via Docker com volume montado no EFS
+
+**Etapas:**
+- Criar Launch Template com `user-data`
+Pesquisamos na página inicial AWS por Launch Template, e em seguida selecionamos "Create Template". Na página inicial, selecionamos um nome e uma descrição da versão do Template. 
+![Create Template](imgs/template1.png)
+Em seguida selecionamos a imagem base desse template, que no caso foi uma imagem Ubuntu.
+![Image](imgs/template2.png)
+O próximo são as tags, que podem ou não ser necessárias a depender do uso do seu projeto.
+![Tags](imgs/template3.png)
+Em seguida selecionamos o par de chaves para autenticação SSH.
+![Key Pair](imgs/template4.png)
+Em Network Settings, podemos selecionar um grupo existente, selecionando o grupo que criamos na versão 1.0. Selecionamos também a AZ onde desejamos colocar a instância. 
+![Network Settings](imgs/template5.png)
+Podemos permitir o monitoramento CloudWatch ou não, a depender do projeto.
+![CloudWatch](imgs/template7.png)
+Ao fim inserimos o script do user-data.
+![User Data](imgs/template8.png)
+
+**Descrição do user-data**
+- Primeiramente realizamos as instalações necessárias e inicializamos o docker. O sudo é utilizado para que os comandos docker funcionem.
+~~~
+#!/bin/bash
+sudo su
+
+# Dependencias
+yum update -y
+yum install -y docker git amazon-efs-utils jq aws-cli
+
+systemctl start docker
+systemctl enable docker
+~~~
+- Aqui instalamos o Docker Compose
+~~~
+# Instalar Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+~~~
+- Aqui realizamos a montagem da EFS, utilizando seu ID
+~~~
+# Montar EFS 
+export EFS_ID=fs-xxxxxxxx
+mkdir -p /var/www/html
+mount -t efs ${EFS_ID}:/ /var/www/html
+echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab
+~~~
+- Agora buscaremos os segredos no Secrets Manager, para utilizarmos na inicialização do Banco de Dados.
+~~~
+#Buscar secrets
+SECRET_NAME=xxxx
+REGION=us-east-2
+
+SECRET_JSON=$(aws secretsmanager get-secret-value \
+  --secret-id $SECRET_NAME \
+  --region $REGION \
+  --query SecretString \
+  --output text)
+
+export DB_NAME=$(echo $SECRET_JSON | jq -r .DB_NAME)
+export DB_USER=$(echo $SECRET_JSON | jq -r .DB_USER)
+export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PASSWORD)
+export DB_HOST=$(echo $SECRET_JSON | jq -r .DB_HOST)
+~~~
+Criamos aqui o docker-compose selecionando os serviços desejados, e ao fim inicializamos.
+~~~
+# Arquivos docker
+mkdir -p /opt/wordpress-docker
+cd /opt/wordpress-docker
+
+cat > docker-compose.yml <<EOF
+version: '3.1'
+
+services:
+  wordpress:
+    image: wordpress
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      WORDPRESS_DB_HOST: ${DB_HOST}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+    volumes:
+      - /var/www/html:/var/www/html
+EOF
+
+# Iniciar container
+docker-compose up -d
+~~~
 
 ---
 
