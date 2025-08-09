@@ -157,7 +157,7 @@ export DB_USER=$(echo $SECRET_JSON | jq -r .DB_USER)
 export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PASSWORD)
 export DB_HOST=$(echo $SECRET_JSON | jq -r .DB_HOST)
 ~~~
-Criamos aqui o docker-compose selecionando os serviços desejados, e ao fim inicializamos.
+- Criamos aqui o docker-compose selecionando os serviços desejados, e ao fim inicializamos.
 ~~~
 # Arquivos docker
 mkdir -p /opt/wordpress-docker
@@ -187,6 +187,26 @@ docker-compose up -d
 
 ---
 
+### 🔹 **v1.3 - Criação do Auto Scaling Group (ASG) e Configuração do Application Load Balancer (ALB)**
+**Objetivo**: Garantir alta disponibilidade com escalabilidade automática e distribuir o tráfego entre instâncias
+
+**Etapas:**
+- Na página inicial da AWS, buscamos por Auto Scaling Groups. Na página inicial, clicamos em "Create Auto Scaling Group". Em seguida, escolhemos nome e o "Launch Template" criado anteriormente como base. Selecione a versão correta de seu Launch Template.
+![Create ASG](imgs/asg1.png)
+- Selecionamos em seguida as opções de Rede, selecionando VPC, AZs, e Balanced Only. 
+![Network](imgs/asg2.png)
+- Na opção seguinte, podemos selecionar um Load Balancer já criado ou criar um para esse grupo. Selecionando "Attach to a new load balancer", temos a tela de criação do ALB.
+![ALB](imgs/lb1.png)
+- Aqui, selecionar "Application Load Balancer", um nome, se é externo ou interno, VPC, AZ e redes.
+![Configurações LB](imgs/lb2.png)
+- Ao fim, caso seja necessário, configure um listener em uma porta para acesso.
+![Listener](imgs/lb3.png)
+- Voltando ao ASG, temos as configurações de Health Checks
+![Health Checks](imgs/asg3.png)
+- E, para concluir, selecione o tamanho do grupo - sua capacidade desejada. Em "Scaling", selecione os limites inferior e superior da sua capacidade.
+![Capacidade](imgs/asg4.png)
+
+---
 ## Recursos utilizados
 
 | Serviço AWS     | Uso                            |
