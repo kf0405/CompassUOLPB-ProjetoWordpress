@@ -75,6 +75,26 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 
 ---
 
+### 🔹 **v1.1 - Configuração do EFS**
+**Objetivo**: Criar o sistema de arquivos compartilhado entre instâncias
+
+![]
+**Etapas:**
+- Criar EFS
+Para criar o EFS, pesquisaremos por EFS e selecionaremos "Create". Nessa janela, selecionamos nome, tipo, e AZ.
+![Create](imgs/efs1.png)
+Em seguida, em configurações de performance, selecionamos Bursting, pois não necessitamos, para o projeto da performance balanceada do modo "Enhanced".
+![Performance](imgs/efs3.png)
+Em "Lifecycle Management" podemos também retirar as opções de transição para outros tipos de armazenamento, para fins de projeto. Observamos que essas opções são muito interessantes para a preservação dos dados.
+![Lifecycle Management](imgs/efs4.png)
+
+- Montar o EFS em `/var/www/html`
+Ao script user-data, foi adicionadas as linhas abaixo, para montar o EFS na instância quando ela for criada.
+`mount -t efs ${EFS_ID}:/ /var/www/html`
+`echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab`
+
+---
+
 ## Recursos utilizados
 
 | Serviço AWS     | Uso                            |
