@@ -27,35 +27,22 @@ Para cada serviço que desejamos implementar, criaremos um security group separa
 ![Security Group](imgs/sg1.png)
 ![Security Group](imgs/sg2.png)
 As regras que definiremos seguirão a seguinte forma:
-Tipo | Protocolo e Porta | Origem
-1. Security Group: ALB (Application Load Balancer)
-Inbound:
-HTTP	TCP	80	0.0.0.0/0
-HTTPS	TCP	443	0.0.0.0/0
-Outbound:
-Tudo liberado (0.0.0.0/0) — padrão do ALB, necessário para encaminhar.
-2. Security Group: EC2 (instâncias que rodarão o WordPress)
-Inbound:
-HTTP	TCP	80	SG do ALB	
-NFS	TCP	2049	SG do EFS (se bidirecional)
+| Security Group | Direção  | Protocolo | Porta  | Origem/Destino               | Observação                                   |
+|----------------|----------|-----------|--------|--------------------------------|-----------------------------------------------|
+| **ALB**        | Inbound  | TCP       | 80     | 0.0.0.0/0                      | HTTP aberto para o público                    |
+|                | Inbound  | TCP       | 443    | 0.0.0.0/0                      | HTTPS aberto para o público                   |
+|                | Outbound | All       | All    | 0.0.0.0/0                      | Necessário para encaminhar tráfego            |
+| **EC2**        | Inbound  | TCP       | 80     | SG do ALB                      | Recebe tráfego HTTP do ALB                    |
+|                | Inbound  | TCP       | 2049   | SG do EFS                      | Comunicação com EFS (NFS)                     |
+|                | Outbound | TCP       | 3306   | SG do RDS                      | Conecta ao banco MySQL/Aurora                  |
+|                | Outbound | TCP       | 2049   | SG do EFS                      | Monta o EFS                                   |
+|                | Outbound | TCP       | 443    | 0.0.0.0/0                      | Acessa serviços externos via HTTPS            |
+| **RDS**        | Inbound  | TCP       | 3306   | SG da EC2                      | Somente EC2 pode acessar o banco               |
+|                | Outbound | Nenhuma   | -      | -                              | RDS não inicia conexões                        |
+| **EFS**        | Inbound  | TCP       | 2049   | SG da EC2                      | Somente EC2 pode montar o EFS                  |
+|                | Outbound | Nenhuma   | -      | -                              | Não é necessário outbound                      |
 
-Outbound:
-MySQL/Aurora	TCP	3306	SG do RDS
-NFS	TCP	2049	SG do EFS
-HTTPS	TCP	443	0.0.0.0/0	
 
-3. Security Group: RDS (MySQL/MariaDB)
-Inbound:
-MySQL	TCP	3306	SG da EC2	Só EC2 pode acessar o banco
-
-Outbound:
-Nenhuma regra (RDS não inicia conexões)
-
-4. Security Group: EFS
-Inbound:
-NFS	TCP	2049	SG da EC2	Só EC2 pode montar o EFS
-Outbound:
-Nenhuma necessária
 ![Resultado final](imgs/sg3.png)
 
 ---
