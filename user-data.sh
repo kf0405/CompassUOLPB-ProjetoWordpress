@@ -20,8 +20,8 @@ mount -t efs ${EFS_ID}:/ /var/www/html
 echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab
 
 #Buscar secrets
-SECRET_NAME=wordpress-db-secret
-REGION=us-east-1
+SECRET_NAME=xxxx
+REGION=us-east-2
 
 SECRET_JSON=$(aws secretsmanager get-secret-value \
   --secret-id $SECRET_NAME \
