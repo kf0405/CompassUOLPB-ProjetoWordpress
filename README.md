@@ -17,11 +17,11 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
   ![Dashboard VPC](imgs/vpc1.png)
   A partir dela, clicamos em 'Criar VPC'. Na janela de criação, selecione o modo VPC and more, para criação automática da VPC com subnets e routing tables. Escolha o nome desejado e o bloco IPv4 desejado.
   ![Criar VPC](imgs/vpc2.png)
-  Em seguida, selecione o número de Availability Zones desejadas para a VPC, assim como o número de redes privadas e públicas em cada uma. Para o projeto em questão, escolhemos 2 AZs, com 2 redes privadas e 2 redes públicas.
+  Em seguida, selecione o número de Availability Zones desejadas para a VPC, assim como o número de redes privadas e públicas em cada uma. Para o projeto em questão, escolhemos 2 AZs, com 4 redes privadas e 2 redes públicas.
   ![Redes VPC](imgs/vpc3.png)
-  Por fim, selecione o NAT Gateway, que será criado para que tenhamos acesso público às redes privadas.
+  Por fim, selecione o NAT Gateway, que será criado para que tenhamos acesso público às redes privadas. Lembrando que necessitaremos de um NAT Gateway em cada subnet pública para acessar as privadas.
   ![NAT Gateway](imgs/vpc4.png)
-
+  
 ---
 
 - Criação dos SGs
@@ -76,45 +76,52 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 ---
 
 ### 🔹 **v1.1 - Configuração do EFS**
+
 **Objetivo**: Criar o sistema de arquivos compartilhado entre instâncias
 **Etapas:**
+
 - Criar EFS
-Para criar o EFS, pesquisaremos por EFS e selecionaremos "Create". Nessa janela, selecionamos nome, tipo, e AZ.
-![Create](imgs/efs1.png)
-Em seguida, em configurações de performance, selecionamos Bursting, pois não necessitamos, para o projeto da performance balanceada do modo "Enhanced".
-![Performance](imgs/efs3.png)
-Em "Lifecycle Management" podemos também retirar as opções de transição para outros tipos de armazenamento, para fins de projeto. Observamos que essas opções são muito interessantes para a preservação dos dados.
-![Lifecycle Management](imgs/efs4.png)
+  Para criar o EFS, pesquisaremos por EFS e selecionaremos "Create". Nessa janela, selecionamos nome, tipo, e AZ.
+  ![Create](imgs/efs1.png)
+  Em seguida, em configurações de performance, selecionamos Bursting, pois não necessitamos, para o projeto da performance balanceada do modo "Enhanced".
+  ![Performance](imgs/efs3.png)
+  Em "Lifecycle Management" podemos também retirar as opções de transição para outros tipos de armazenamento, para fins de projeto. Observamos que essas opções são muito interessantes para a preservação dos dados.
+  ![Lifecycle Management](imgs/efs4.png)
 
 - Montar o EFS em `/var/www/html`
-Ao script user-data, foi adicionadas as linhas abaixo, para montar o EFS na instância quando ela for criada.
-`mount -t efs ${EFS_ID}:/ /var/www/html`
-`echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab`
+  Ao script user-data, foi adicionadas as linhas abaixo, para montar o EFS na instância quando ela for criada.
+  `mount -t efs ${EFS_ID}:/ /var/www/html`
+  `echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab`
 
 ---
+
 ### 🔹 **v1.2 - Deploy do WordPress com Docker e EFS**
+
 **Objetivo**: Rodar o WordPress via Docker com volume montado no EFS
 
 **Etapas:**
+
 - Criar Launch Template com `user-data`
-Pesquisamos na página inicial AWS por Launch Template, e em seguida selecionamos "Create Template". Na página inicial, selecionamos um nome e uma descrição da versão do Template. 
-![Create Template](imgs/template1.png)
-Em seguida selecionamos a imagem base desse template, que no caso foi uma imagem Ubuntu.
-![Image](imgs/template2.png)
-O próximo são as tags, que podem ou não ser necessárias a depender do uso do seu projeto.
-![Tags](imgs/template3.png)
-Em seguida selecionamos o par de chaves para autenticação SSH.
-![Key Pair](imgs/template4.png)
-Em Network Settings, podemos selecionar um grupo existente, selecionando o grupo que criamos na versão 1.0. Selecionamos também a AZ onde desejamos colocar a instância. 
-![Network Settings](imgs/template5.png)
-Podemos permitir o monitoramento CloudWatch ou não, a depender do projeto.
-![CloudWatch](imgs/template7.png)
-Ao fim inserimos o script do user-data.
-![User Data](imgs/template8.png)
+  Pesquisamos na página inicial AWS por Launch Template, e em seguida selecionamos "Create Template". Na página inicial, selecionamos um nome e uma descrição da versão do Template.
+  ![Create Template](imgs/template1.png)
+  Em seguida selecionamos a imagem base desse template, que no caso foi uma imagem Amazon Linux.
+  ![Image](imgs/template2.png)
+  O próximo são as tags, que podem ou não ser necessárias a depender do uso do seu projeto.
+  ![Tags](imgs/template3.png)
+  Em seguida selecionamos o par de chaves para autenticação SSH.
+  ![Key Pair](imgs/template4.png)
+  Em Network Settings, podemos selecionar um grupo existente, selecionando o grupo que criamos na versão 1.0. Selecionamos também a AZ onde desejamos colocar a instância.
+  ![Network Settings](imgs/template5.png)
+  Podemos permitir o monitoramento CloudWatch ou não, a depender do projeto.
+  ![CloudWatch](imgs/template7.png)
+  Ao fim inserimos o script do user-data.
+  ![User Data](imgs/template8.png)
 
 **Descrição do user-data**
+
 - Primeiramente realizamos as instalações necessárias e inicializamos o docker. O sudo é utilizado para que os comandos docker funcionem.
-~~~
+
+```
 #!/bin/bash
 sudo su
 
@@ -124,24 +131,30 @@ yum install -y docker git amazon-efs-utils jq aws-cli
 
 systemctl start docker
 systemctl enable docker
-~~~
+```
+
 - Aqui instalamos o Docker Compose
-~~~
+
+```
 # Instalar Docker Compose
 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-~~~
+```
+
 - Aqui realizamos a montagem da EFS, utilizando seu ID
-~~~
-# Montar EFS 
+
+```
+# Montar EFS
 export EFS_ID=fs-xxxxxxxx
 mkdir -p /var/www/html
 mount -t efs ${EFS_ID}:/ /var/www/html
 echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab
-~~~
+```
+
 - Agora buscaremos os segredos no Secrets Manager, para utilizarmos na inicialização do Banco de Dados.
-~~~
+
+```
 #Buscar secrets
 SECRET_NAME=xxxx
 REGION=us-east-2
@@ -156,9 +169,11 @@ export DB_NAME=$(echo $SECRET_JSON | jq -r .DB_NAME)
 export DB_USER=$(echo $SECRET_JSON | jq -r .DB_USER)
 export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PASSWORD)
 export DB_HOST=$(echo $SECRET_JSON | jq -r .DB_HOST)
-~~~
+```
+
 - Criamos aqui o docker-compose selecionando os serviços desejados, e ao fim inicializamos.
-~~~
+
+```
 # Arquivos docker
 mkdir -p /opt/wordpress-docker
 cd /opt/wordpress-docker
@@ -183,30 +198,57 @@ EOF
 
 # Iniciar container
 docker-compose up -d
-~~~
+```
 
 ---
 
 ### 🔹 **v1.3 - Criação do Auto Scaling Group (ASG) e Configuração do Application Load Balancer (ALB)**
+
 **Objetivo**: Garantir alta disponibilidade com escalabilidade automática e distribuir o tráfego entre instâncias
 
 **Etapas:**
-- Na página inicial da AWS, buscamos por Auto Scaling Groups. Na página inicial, clicamos em "Create Auto Scaling Group". Em seguida, escolhemos nome e o "Launch Template" criado anteriormente como base. Selecione a versão correta de seu Launch Template.
-![Create ASG](imgs/asg1.png)
-- Selecionamos em seguida as opções de Rede, selecionando VPC, AZs, e Balanced Only. 
-![Network](imgs/asg2.png)
-- Na opção seguinte, podemos selecionar um Load Balancer já criado ou criar um para esse grupo. Selecionando "Attach to a new load balancer", temos a tela de criação do ALB.
-![ALB](imgs/lb1.png)
-- Aqui, selecionar "Application Load Balancer", um nome, se é externo ou interno, VPC, AZ e redes.
-![Configurações LB](imgs/lb2.png)
-- Ao fim, caso seja necessário, configure um listener em uma porta para acesso.
-![Listener](imgs/lb3.png)
-- Voltando ao ASG, temos as configurações de Health Checks
-![Health Checks](imgs/asg3.png)
-- E, para concluir, selecione o tamanho do grupo - sua capacidade desejada. Em "Scaling", selecione os limites inferior e superior da sua capacidade.
-![Capacidade](imgs/asg4.png)
 
+- Na página inicial da AWS, buscamos por Auto Scaling Groups. Na página inicial, clicamos em "Create Auto Scaling Group". Em seguida, escolhemos nome e o "Launch Template" criado anteriormente como base. Selecione a versão correta de seu Launch Template.
+  ![Create ASG](imgs/asg1.png)
+- Selecionamos em seguida as opções de Rede, selecionando VPC, AZs, e Balanced Only. Lembrando que para o caso desse projeto, a subnet deverá ser uma private, e não public.
+  ![Network](imgs/asg2.png)
+- Na opção seguinte, podemos selecionar um Load Balancer já criado ou criar um para esse grupo. Selecionando "Attach to a new load balancer", temos a tela de criação do ALB.
+  ![ALB](imgs/lb1.png)
+- Aqui, selecionar "Application Load Balancer", um nome, se é externo ou interno, VPC, AZ e redes.
+  ![Configurações LB](imgs/lb2.png)
+- Ao fim, caso seja necessário, configure um listener em uma porta para acesso.
+  ![Listener](imgs/lb3.png)
+- Voltando ao ASG, temos as configurações de Health Checks
+  ![Health Checks](imgs/asg3.png)
+- E, para concluir, selecione o tamanho do grupo - sua capacidade desejada. Em "Scaling", selecione os limites inferior e superior da sua capacidade.
+  ![Capacidade](imgs/asg4.png)
 ---
+### v1.4 Criação do Bastion Host
+Criaremos uma instância EC2, designada como Bastion Host, nas subnets públicas, para podermos nos conectar às instâncias em subnets privadas.
+---
+### Atividades extras
+
+**Criando AMI**
+
+- Para criar uma AMI, é necessário que exista uma instância criada. Selecione a instância e clique em "Actions" e em seguida "Images and Templates -> Create Image"
+- Preencha o nome da imagem, sua descrição, marque como No reboot se desejar que ela não se reinicialize
+- Encerre clicando "Create Image"
+- Utilize tags para melhor configurar sua AMI.
+
+**Monitoramento com CloudWatch**
+- Pesquise por CloudWatch. Podemos adicionar alarmes para registrar erros como quedas do serviço. Clicamos em "Create Alarm".
+- Em seguida clicamos em "Select Metric". 
+- Podemos aqui criar vários tipos de alarmes para registro no CloudWatch. Nesse caso, usaremos alarmes no Auto Scaling Group, para observar as alterações no número de instâncias.
+
+
+**Script CloudFormation**
+
+**Aumento do tráfego simulado para testar ASG**
+- Para simular o aumento de tráfego, podemos usar o ApacheBench, que já é comum em várias distribuições Linux. Usamos com ele um comando da seguinte forma, a fim de aumentar a carga do servidor.
+`ab -n 1000 -c 50 http://<your-ec2-public-ip>/`
+- Esse comando pode ser executado acessando a instância.
+---
+
 ## Recursos utilizados
 
 | Serviço AWS     | Uso                            |

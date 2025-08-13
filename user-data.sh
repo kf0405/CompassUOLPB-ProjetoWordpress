@@ -16,8 +16,7 @@ ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 # Montar EFS 
 export EFS_ID=fs-xxxxxxxx
 mkdir -p /var/www/html
-mount -t efs ${EFS_ID}:/ /var/www/html
-echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab
+sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFS_ID}.efs.us-east-2.amazonaws.com:/ /var/www/html 
 
 #Buscar secrets
 SECRET_NAME=xxxx
