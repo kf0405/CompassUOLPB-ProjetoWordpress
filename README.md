@@ -4,6 +4,22 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 
 ---
 
+## Recursos utilizados
+
+Certifique-se de possuir acesso à todos os seguintes serviços utilizados:
+
+| Serviço AWS     | Uso                            |
+| --------------- | ------------------------------ |
+| VPC             | Rede personalizada             |
+| EC2             | Instâncias para WordPress      |
+| RDS             | Banco de dados relacional      |
+| EFS             | Armazenamento compartilhado    |
+| ALB             | Load balancer de aplicação     |
+| ASG             | Escalabilidade automática      |
+| Secrets Manager | Armazenamento seguro de senhas |
+
+---
+
 ## Versões do Projeto
 
 ### 🔹 **v1.0 - Criação da VPC, dos SGs e do RDS**
@@ -12,19 +28,21 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 
 **Etapas:**
 
-- Criação da VPC
+- Criação da VPC  
   Para criar a VPC, acessamos inicialmente a dashboard VPC, pesquisando pela VPC na página inicial da AWS. Ao clicar em VPC, veremos a seguinte página:
   ![Dashboard VPC](imgs/vpc1.png)
   A partir dela, clicamos em 'Criar VPC'. Na janela de criação, selecione o modo VPC and more, para criação automática da VPC com subnets e routing tables. Escolha o nome desejado e o bloco IPv4 desejado.
   ![Criar VPC](imgs/vpc2.png)
   Em seguida, selecione o número de Availability Zones desejadas para a VPC, assim como o número de redes privadas e públicas em cada uma. Para o projeto em questão, escolhemos 2 AZs, com 4 redes privadas e 2 redes públicas.
   ![Redes VPC](imgs/vpc3.png)
-  Por fim, selecione o NAT Gateway, que será criado para que tenhamos acesso público às redes privadas. Lembrando que necessitaremos de um NAT Gateway em cada subnet pública para acessar as privadas.
+  Por fim, selecione o NAT Gateway, que será criado para que tenhamos acesso público às redes privadas. Lembrando que necessitaremos de um NAT Gateway para cada subnet pública para acessar as privadas ou apenas um só para todas as privadas, que será o caso escolhido nesse projeto. Em produção, seria interessante utilizar 2 NATs.
   ![NAT Gateway](imgs/vpc4.png)
-  
+  Resultado final:
+  ![Resultado final da criação VPC](imgs/vpc6.png)
+
 ---
 
-- Criação dos SGs
+- Criação dos SGs  
   Para cada serviço que desejamos implementar, criaremos um security group separado, a fim de separar as funcionalidades desejadas a cada um. Entrando em security group, veremos a página de criação de security group. Nessa página, escolhemos um nome, descrição, à qual VPC pertence esse grupo, e definimos suas regras Inbound e Outbound.
   ![Security Group](imgs/sg1.png)
   ![Security Group](imgs/sg2.png)
@@ -53,7 +71,7 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 
 ---
 
-- Criação do RDS
+- Criação do RDS  
   Para criar o RDS, pesquisaremos por "Aurora and RDS" na página inicial da AWS. Nessa página, como podemos ver abaixo, clicaremos em "Create Database"
   ![RDS Dashboard](imgs/rds1.png)
   No início da criação, escolheremos o modo de criação "Standard Create", onde podemos definir mais configurações, e selecionaremos como engine o "MySQL"
@@ -80,18 +98,17 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 **Objetivo**: Criar o sistema de arquivos compartilhado entre instâncias
 **Etapas:**
 
-- Criar EFS
+- Criar EFS  
   Para criar o EFS, pesquisaremos por EFS e selecionaremos "Create". Nessa janela, selecionamos nome, tipo, e AZ.
   ![Create](imgs/efs1.png)
   Em seguida, em configurações de performance, selecionamos Bursting, pois não necessitamos, para o projeto da performance balanceada do modo "Enhanced".
   ![Performance](imgs/efs3.png)
   Em "Lifecycle Management" podemos também retirar as opções de transição para outros tipos de armazenamento, para fins de projeto. Observamos que essas opções são muito interessantes para a preservação dos dados.
-  ![Lifecycle Management](imgs/efs4.png)
-
-- Montar o EFS em `/var/www/html`
-  Ao script user-data, foi adicionadas as linhas abaixo, para montar o EFS na instância quando ela for criada.
-  `mount -t efs ${EFS_ID}:/ /var/www/html`
-  `echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab`
+  ![Lifecycle Management](imgs/efs4.png)  
+  Após a criação, entre em "View Details" do file system criado e clique em "Attach".
+  ![Attach](imgs/efs6.png)  
+  Com a opção "Mount via DNS" selecionada, copie o comando para montar pelo NFS, ele será utilizado posteriormente no script user-data, com a alteração para que montemos em /var/www/html. Um exemplo de comando pode ser visto abaixo.
+  `sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFS_ID}.efs.us-east-2.amazonaws.com:/ /var/www/html`
 
 ---
 
@@ -101,21 +118,29 @@ Este projeto tem como objetivo implantar uma arquitetura escalável e de alta di
 
 **Etapas:**
 
-- Criar Launch Template com `user-data`
-  Pesquisamos na página inicial AWS por Launch Template, e em seguida selecionamos "Create Template". Na página inicial, selecionamos um nome e uma descrição da versão do Template.
-  ![Create Template](imgs/template1.png)
-  Em seguida selecionamos a imagem base desse template, que no caso foi uma imagem Amazon Linux.
-  ![Image](imgs/template2.png)
-  O próximo são as tags, que podem ou não ser necessárias a depender do uso do seu projeto.
-  ![Tags](imgs/template3.png)
-  Em seguida selecionamos o par de chaves para autenticação SSH.
-  ![Key Pair](imgs/template4.png)
-  Em Network Settings, podemos selecionar um grupo existente, selecionando o grupo que criamos na versão 1.0. Selecionamos também a AZ onde desejamos colocar a instância.
-  ![Network Settings](imgs/template5.png)
-  Podemos permitir o monitoramento CloudWatch ou não, a depender do projeto.
-  ![CloudWatch](imgs/template7.png)
-  Ao fim inserimos o script do user-data.
-  ![User Data](imgs/template8.png)
+- Criar Launch Template com `user-data`  
+  Para criação do Launch template, temos duas opções: criação do template manualmente ou criar uma instância e transformá-la no template. Para fim de projeto, executaremos as duas formas.
+  - Criação EC2  
+    Selecionar tags(as apropriadas do seu projeto, na imagem apenas um exemplo), imagem(usaremos Amazon Linux mais recente), par de chaves.  
+    ![Create EC2](imgs/ec2temp1.png)
+    Ao fim, em "Advanced Details", insira o script de user-data.  
+    Criado o template, clicar com o botão direito e em "Images and Templates", selecionar "Create template from instance".
+    ![Template from instance](imgs/template9.png)
+  - Criação manual  
+    Pesquisamos na página inicial AWS por Launch Template, e em seguida selecionamos "Create Template". Na página inicial, selecionamos um nome e uma descrição da versão do Template.
+    ![Create Template](imgs/template1.png)
+    Em seguida selecionamos a imagem base desse template, que no caso foi uma imagem Amazon Linux.
+    ![Image](imgs/template2.png)
+    O próximo são as tags, que podem ou não ser necessárias a depender do uso do seu projeto.
+    ![Tags](imgs/template3.png)
+    Em seguida selecionamos o par de chaves para autenticação SSH.
+    ![Key Pair](imgs/template4.png)
+    Em Network Settings, podemos selecionar um grupo existente, selecionando o grupo que criamos na versão 1.0. Selecionamos também a AZ onde desejamos colocar a instância.
+    ![Network Settings](imgs/template5.png)
+    Podemos permitir o monitoramento CloudWatch ou não, a depender do projeto.
+    ![CloudWatch](imgs/template7.png)
+    Ao fim inserimos o script do user-data.
+    ![User Data](imgs/template8.png)
 
 **Descrição do user-data**
 
@@ -142,17 +167,15 @@ chmod +x /usr/local/bin/docker-compose
 ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 ```
 
-- Aqui realizamos a montagem da EFS, utilizando seu ID
+- Aqui realizamos a montagem da EFS, utilizando seu ID. Lembre-se de substituir o seu ID em EFS_ID.
 
 ```
-# Montar EFS
-export EFS_ID=fs-xxxxxxxx
+# Montar EFS  
 mkdir -p /var/www/html
-mount -t efs ${EFS_ID}:/ /var/www/html
-echo "${EFS_ID}:/ /var/www/html efs defaults,_netdev 0 0" >> /etc/fstab
+sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFS_ID}.efs.us-east-2.amazonaws.com:/ /var/www/html
 ```
 
-- Agora buscaremos os segredos no Secrets Manager, para utilizarmos na inicialização do Banco de Dados.
+- Agora buscaremos os segredos no Secrets Manager, para utilizarmos na inicialização do Banco de Dados. Coloque na variável SECRET-NAME o nome do seu secret.
 
 ```
 #Buscar secrets
@@ -165,10 +188,10 @@ SECRET_JSON=$(aws secretsmanager get-secret-value \
   --query SecretString \
   --output text)
 
-export DB_NAME=$(echo $SECRET_JSON | jq -r .DB_NAME)
+export DB_NAME="INSIRA_NOME_AQUI"
 export DB_USER=$(echo $SECRET_JSON | jq -r .DB_USER)
 export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PASSWORD)
-export DB_HOST=$(echo $SECRET_JSON | jq -r .DB_HOST)
+export DB_HOST="INSIRA_HOST_AQUI"
 ```
 
 - Criamos aqui o docker-compose selecionando os serviços desejados, e ao fim inicializamos.
@@ -222,10 +245,18 @@ docker-compose up -d
   ![Health Checks](imgs/asg3.png)
 - E, para concluir, selecione o tamanho do grupo - sua capacidade desejada. Em "Scaling", selecione os limites inferior e superior da sua capacidade.
   ![Capacidade](imgs/asg4.png)
+
 ---
-### v1.4 Criação do Bastion Host
-Criaremos uma instância EC2, designada como Bastion Host, nas subnets públicas, para podermos nos conectar às instâncias em subnets privadas.
+
+### v1.4 Criação do Bastion Host e Atividades extras
+
+- Criaremos uma instância EC2, designada como Bastion Host, nas subnets públicas, para podermos nos conectar às instâncias em subnets privadas.
+- Para fim de testes, basta criar uma instância, utilizar as tags desejadas, e se conectar a ela. Lembre-se de colocá-la na mesma VPC das outras, se não não conseguiremos conectar à elas.
+- Lembrar também de adicionar ao SG das EC2 a regra de Inbound do SSH, para permitir a conexão do Bastion às mesmas.
+- Para conectar às instâncias privadas usando o bastion host, podemos utilizar o comando abaixo:  
+`ssh -J user@bastion_host user@target_host`
 ---
+
 ### Atividades extras
 
 **Criando AMI**
@@ -236,29 +267,15 @@ Criaremos uma instância EC2, designada como Bastion Host, nas subnets públicas
 - Utilize tags para melhor configurar sua AMI.
 
 **Monitoramento com CloudWatch**
+
 - Pesquise por CloudWatch. Podemos adicionar alarmes para registrar erros como quedas do serviço. Clicamos em "Create Alarm".
-- Em seguida clicamos em "Select Metric". 
-- Podemos aqui criar vários tipos de alarmes para registro no CloudWatch. Nesse caso, usaremos alarmes no Auto Scaling Group, para observar as alterações no número de instâncias.
-
-
-**Script CloudFormation**
+- Em seguida clicamos em "Select Metric".
+- Podemos aqui criar vários tipos de alarmes para registro no CloudWatch. Nesse caso, usaremos alarmes no Auto Scaling Group, para observar as alterações no número de instâncias.  
 
 **Aumento do tráfego simulado para testar ASG**
+
 - Para simular o aumento de tráfego, podemos usar o ApacheBench, que já é comum em várias distribuições Linux. Usamos com ele um comando da seguinte forma, a fim de aumentar a carga do servidor.
-`ab -n 1000 -c 50 http://<your-ec2-public-ip>/`
-- Esse comando pode ser executado acessando a instância.
----
-
-## Recursos utilizados
-
-| Serviço AWS     | Uso                            |
-| --------------- | ------------------------------ |
-| VPC             | Rede personalizada             |
-| EC2             | Instâncias para WordPress      |
-| RDS             | Banco de dados relacional      |
-| EFS             | Armazenamento compartilhado    |
-| ALB             | Load balancer de aplicação     |
-| ASG             | Escalabilidade automática      |
-| Secrets Manager | Armazenamento seguro de senhas |
+  `ab -n 1000 -c 50 http://<your-ec2-public-ip>/`
+- Esse comando pode ser executado acessando a instância.  
 
 ---

@@ -13,8 +13,7 @@ curl -L "https://github.com/docker/compose/releases/latest/download/docker-compo
 chmod +x /usr/local/bin/docker-compose
 ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# Montar EFS 
-export EFS_ID=fs-xxxxxxxx
+# Montar EFS  
 mkdir -p /var/www/html
 sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFS_ID}.efs.us-east-2.amazonaws.com:/ /var/www/html 
 
@@ -28,10 +27,10 @@ SECRET_JSON=$(aws secretsmanager get-secret-value \
   --query SecretString \
   --output text)
 
-export DB_NAME=$(echo $SECRET_JSON | jq -r .DB_NAME)
+export DB_NAME="INSIRA_NOME_AQUI"
 export DB_USER=$(echo $SECRET_JSON | jq -r .DB_USER)
 export DB_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PASSWORD)
-export DB_HOST=$(echo $SECRET_JSON | jq -r .DB_HOST)
+export DB_HOST="INSIRA_HOST_AQUI"
 
 # Arquivos docker
 mkdir -p /opt/wordpress-docker
